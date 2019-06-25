@@ -1,0 +1,19 @@
+{
+  "name": "pull-request-status",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shorinji/pull-request-notifier.git"
+  },
+  "author": "Fredrik Fall",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/shorinji/pull-request-status/issues"
+  },
+  "homepage": "https://github.com/shorinji/pull-request-status#readme"
+}
