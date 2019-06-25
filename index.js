@@ -22,8 +22,19 @@ const parseResponse = (error, stdout, stderr) => {
   return null;
 };
 
-if (!(config.username && config.token)) {
-  console.error("Before running first time, you need to edit config.js with your bitbucket config.username and personal access token");
+const checkConfig(config) {
+  let configOk = true;
+  Object.keys(config).forEach(k => {
+    if (!config[k]) {
+      configOk = false;
+    }
+  }
+  return configOk;
+}
+
+
+if (!checkConfig(config)) {
+  console.error("Please add your settings to config.js");
   process.exit(-1);
 }
 
@@ -34,9 +45,10 @@ if (!child_process.execSync("which curl")) {
 
 
 const authorizationHeader = `Authorization: Bearer ${config.token}`;
-const baseUrl =
-  "https://git.etraveli.net/rest/api/1.0/projects/WEB/repos/eti-web/pull-requests";
-const cmd = `curl -H "Content-Type: application/json" -H "${authorizationHeader}" ${baseUrl}`;
+
+const prUrl =
+  `${config.baseUrl}/rest/api/1.0/projects/${config.project}/repos/${config.repo}/pull-requests";
+const cmd = `curl -H "Content-Type: application/json" -H "${authorizationHeader}" ${prUrl}`;
 
 
 child_process.exec(cmd, (error, stdout, stderr) => {
@@ -52,7 +64,7 @@ child_process.exec(cmd, (error, stdout, stderr) => {
   const yellowAnsiColor = 43;
 
   response.values.forEach((pr, index) => {
-    const cmd = `curl -H "Content-Type: application/json" -H "${authorizationHeader}" ${baseUrl}/${
+    const cmd = `curl -H "Content-Type: application/json" -H "${authorizationHeader}" ${prUrl}/${
       pr.id
     }`;
     child_process.exec(cmd, (error, stdout, stderr) => {
