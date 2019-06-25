@@ -22,15 +22,15 @@ const parseResponse = (error, stdout, stderr) => {
   return null;
 };
 
-const checkConfig(config) {
+const checkConfig = config => {
   let configOk = true;
   Object.keys(config).forEach(k => {
     if (!config[k]) {
       configOk = false;
     }
-  }
+  });
   return configOk;
-}
+};
 
 
 if (!checkConfig(config)) {
@@ -47,7 +47,7 @@ if (!child_process.execSync("which curl")) {
 const authorizationHeader = `Authorization: Bearer ${config.token}`;
 
 const prUrl =
-  `${config.baseUrl}/rest/api/1.0/projects/${config.project}/repos/${config.repo}/pull-requests";
+  `${config.baseUrl}/rest/api/1.0/projects/${config.project}/repos/${config.repo}/pull-requests`;
 const cmd = `curl -H "Content-Type: application/json" -H "${authorizationHeader}" ${prUrl}`;
 
 
