@@ -1,6 +1,13 @@
 const https = require("https");
 const config = require("./config");
 
+const white = "97;1m";
+const green = "42;30m";
+const yellow = "43;30m";
+
+const colorReset = "\x1b[0m";
+const color = (str, color) => "\x1b[" + color + str + colorReset;
+
 const abbreviateReviewerName = reviewer => {
   const parts = reviewer.user.displayName.split(" ");
   // special case to get victor's name down to 2 letters
@@ -14,107 +21,128 @@ const parseResponse = (httpResponse, callback) => {
   });
 
   httpResponse.on("end", () => {
-    callback(JSON.parse(body));
+    try {
+      callback(JSON.parse(body));
+    } catch (e) {
+      console.error("json parse error: ", e);
+      callback();
+    }
   });
 };
 
+const pathForRepo = repo =>
+  `/rest/api/1.0/projects/${repo.project}/repos/${repo.repo}/pull-requests`;
+
 const checkConfig = config => {
   let configOk = true;
-  Object.keys(config).forEach(k => {
-    if (!config[k]) {
+  const okKeys = ["username", "token", "serverHostname", "project", "repos"];
+  okKeys.forEach(okKey => {
+    if (!config[okKey]) {
       configOk = false;
     }
   });
   return configOk;
 };
 
-if (!checkConfig(config)) {
-  console.error("Please add your settings to config.js");
-  process.exit(-1);
-}
+const formatReviewerCount = number => (number < 10 ? " " : "") + `(${number})`;
 
-// -------------------------------------------------------
+const getReviewerStatus = (repo, prId, callback) => {
+  const requestOptions = {
+    hostname: config.serverHostname,
+    path: `${pathForRepo(repo)}/${prId}`,
+    headers: {
+      Authorization: `Bearer ${config.token}`
+    }
+  };
 
-const requestOptions = {
-  hostname: config.baseUrl,
-  path: `/rest/api/1.0/projects/${config.project}/repos/${
-    config.repo
-  }/pull-requests`,
-  headers: {
-    Authorization: `Bearer ${config.token}`
-  }
-};
-
-https.get(requestOptions, response => {
-  if (response.statusCode !== 200) {
-    console.error(response.statusMessage);
-    return;
-  }
-
-  parseResponse(response, jsonResponse => {
-    if (!jsonResponse) {
-      console.error("bailing out...");
+  https.get(requestOptions, response => {
+    if (response.statusCode !== 200) {
+      console.error(response.statusMessage);
+      callback();
       return;
     }
-    const keys = ["id", "state", "open", "closed", "title"];
 
-    const whiteAnsiColor = 37;
-    const greenAnsiColor = 42;
-    const yellowAnsiColor = 43;
+    parseResponse(response, jsonResponse => {
+      if (!jsonResponse) {
+        callback();
+        return;
+      }
+      callback(jsonResponse);
+    });
+  });
+};
 
-    jsonResponse.values.forEach((pr, index) => {
-      const requestOptions = {
-        hostname: config.baseUrl,
-        path: `/rest/api/1.0/projects/${config.project}/repos/${
-          config.repo
-        }/pull-requests/${pr.id}`,
-        headers: {
-          Authorization: `Bearer ${config.token}`
-        }
-      };
+const printRepoStatus = repo => {
+  const indexRequestOptions = {
+    hostname: config.serverHostname,
+    path: pathForRepo(repo),
+    headers: {
+      Authorization: `Bearer ${config.token}`
+    }
+  };
 
-      https.get(requestOptions, response => {
-        if (response.statusCode !== 200) {
-          console.error(response.statusMessage);
-          return;
-        }
+  https.get(indexRequestOptions, response => {
+    if (response.statusCode !== 200) {
+      console.error(response.statusMessage);
+      return;
+    }
 
-        parseResponse(response, jsonResponse => {
+    parseResponse(response, jsonResponse => {
+      if (!jsonResponse) {
+        return;
+      }
+
+      jsonResponse.values.forEach(pr => {
+        getReviewerStatus(repo, pr.id, jsonResponse => {
+          if (!jsonResponse) {
+            return;
+          }
+
           const approvers = jsonResponse.reviewers.filter(r => r.approved);
           const approverNames = approvers
             .map(abbreviateReviewerName)
-            .map(name => "\x1b[" + greenAnsiColor + ";30m " + name + " \x1b[0m")
+            .map(name => color(` ${name} `, green))
             .join(" ");
 
           const unapprovers = jsonResponse.reviewers.filter(r => !r.approved);
           const unapproverNames = unapprovers
             .map(abbreviateReviewerName)
-            .map(
-              name => "\x1b[" + yellowAnsiColor + ";30m " + name + " \x1b[0m"
-            )
+            .map(name => color(` ${name} `, yellow))
             .join(" ");
 
           const author = jsonResponse.author.user.displayName;
 
           console.log(
-            `\n[${jsonResponse.id}] ${jsonResponse.title}  [${
-              jsonResponse.author.user.name === config.username
-                ? "\x1b[" + whiteAnsiColor + ";1m" + author + "\x1b[0m"
-                : author
-            }]`
+            "\n" +
+              color(repo.repo, white) +
+              ` [${jsonResponse.id}] ${jsonResponse.title}  [${
+                jsonResponse.author.user.name === config.username
+                  ? color(author, white)
+                  : author
+              }]`
           );
           console.log(
             "UNAPPROVED  %s  %s",
-            (unapprovers.length < 10 ? " (" : "(") + unapprovers.length + ")",
+            formatReviewerCount(unapprovers.length),
             unapproverNames
           );
           console.log(
             "APPROVED    %s  %s",
-            (approvers.length < 10 ? " (" : "(") + approvers.length + ")",
+            formatReviewerCount(approvers.length),
             approverNames
           );
         });
       });
     });
   });
-});
+};
+
+// -------------------------------------------------------
+
+if (!checkConfig(config)) {
+  console.error("Please fill in config.js");
+  process.exit(-1);
+}
+console.log("config ok");
+
+config.repos.forEach(printRepoStatus);
