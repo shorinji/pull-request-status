@@ -8,6 +8,9 @@ const yellow = "43;30m";
 const colorReset = "\x1b[0m";
 const color = (str, color) => "\x1b[" + color + str + colorReset;
 
+const authorsToInclude = [];
+const authorToHighlight = config.username;
+
 const abbreviateReviewerName = reviewer => {
   const parts = reviewer.user.displayName.split(" ");
   // special case to get victor's name down to 2 letters
@@ -93,6 +96,12 @@ const printRepoStatus = repo => {
       }
 
       jsonResponse.values.forEach(pr => {
+        if (authorsToInclude.length > 0) {
+          if (authorsToInclude.indexOf(pr.author.user.name) === -1) {
+            return;
+          }
+        }
+
         getReviewerStatus(repo, pr.id, jsonResponse => {
           if (!jsonResponse) {
             return;
@@ -116,20 +125,24 @@ const printRepoStatus = repo => {
             "\n" +
               color(repo.repo, white) +
               ` [${jsonResponse.id}] ${jsonResponse.title}  [${
-                jsonResponse.author.user.name === config.username
+                jsonResponse.author.user.name === authorToHighlight
                   ? color(author, white)
                   : author
               }]`
           );
           console.log(
-            "UNAPPROVED  %s  %s",
+            "UNAPPROVED   %s  %s",
             formatReviewerCount(unapprovers.length),
             unapproverNames
           );
           console.log(
-            "APPROVED    %s  %s",
+            "APPROVED     %s  %s",
             formatReviewerCount(approvers.length),
             approverNames
+          );
+          const isReady = approvers.length >= 2;
+          console.log(
+            color(isReady ? "READY" : "IN PROGRESS", isReady ? green : yellow)
           );
         });
       });
